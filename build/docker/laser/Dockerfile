@@ -2,7 +2,7 @@
 FROM golang:1.10.3 as builder
 COPY . /go/src/github.com/michaeloverton/ddos-laser/
 WORKDIR /go/src/github.com/michaeloverton/ddos-laser/cmd/laser/
-RUN CGO_ENABLED=0 go build -a
+RUN CGO_ENABLED=0 go build
 
 # build final image
 FROM alpine:latest

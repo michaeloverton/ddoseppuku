@@ -12,17 +12,17 @@ import (
 // NewRouter returns the targets's router.
 func NewRouter() *mux.Router {
 	router := mux.NewRouter()
-	router.Methods("GET").Path("/destroyme").HandlerFunc(destroy)
+	router.Methods("GET").Path("/thrash").HandlerFunc(thrash)
 	return router
 }
 
-type destroyResponse struct {
+type targetResponse struct {
 	Text string `json:"text"`
 }
 
-func destroy(res http.ResponseWriter, req *http.Request) {
-	log.Info("responding to request")
-	resp := destroyResponse{
+func thrash(res http.ResponseWriter, req *http.Request) {
+	log.Info("responding to request from: ", req.Host)
+	resp := targetResponse{
 		Text: "whatever",
 	}
 	time.Sleep(time.Second * 5)
