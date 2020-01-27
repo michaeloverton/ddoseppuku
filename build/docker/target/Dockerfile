@@ -9,5 +9,5 @@ FROM alpine:latest
 RUN apk add --update bash ca-certificates
 COPY --from=builder /go/src/github.com/michaeloverton/ddos-laser/cmd/target/target /opt/
 WORKDIR /opt
-EXPOSE 3000
+EXPOSE 8080
 CMD ["/opt/target"]

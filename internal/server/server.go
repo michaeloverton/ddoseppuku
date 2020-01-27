@@ -7,8 +7,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// serve writes the status header and marshals the struct passed to include in the response body.
-func serve(res http.ResponseWriter, val interface{}, code int) {
+// Serve writes the status header and marshals the struct passed to include in the response body.
+func Serve(res http.ResponseWriter, val interface{}, code int) {
 	if val != nil {
 		b, err := json.Marshal(&val)
 		if err != nil {
@@ -30,9 +30,8 @@ type statusError struct {
 	Err string `json:"error"`
 }
 
-// serveError writes the http header and error response.
-// Note that when `err` is of type dbError or transError, `code` will be overridden.
-func serveError(res http.ResponseWriter, err error, code int) {
+// ServeError writes the http header and error response.
+func ServeError(res http.ResponseWriter, err error, code int) {
 	// We will marshal serr in the response.
 	serr := statusError{
 		Err: err.Error(),

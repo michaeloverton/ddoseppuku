@@ -9,3 +9,11 @@ services:
     ports:
        - 3000:3000
     restart: always
+
+  target:
+    image: michaeloverton/target
+    env_file:
+      - ../../.env
+    ports:
+       - 8080:8080
+    restart: always
