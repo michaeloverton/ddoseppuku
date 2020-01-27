@@ -20,3 +20,6 @@ build-target:
 		-t michaeloverton/target \
 		-f build/docker/target/Dockerfile \
 		.
+
+vet:
+	go vet ./...

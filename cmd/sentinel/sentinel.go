@@ -1,8 +1,13 @@
 package main
 
 import (
+	"context"
 	"net/http"
+	"os"
+	"os/signal"
+	"time"
 
+	"github.com/michaeloverton/ddos-laser/cmd/sentinel/router"
 	"github.com/michaeloverton/ddos-laser/internal/env"
 	log "github.com/sirupsen/logrus"
 )
@@ -14,14 +19,32 @@ func main() {
 		log.Fatal("error loading environment: ", err.Error())
 	}
 
-	// Set up handler function.
-	http.HandleFunc("/", nil)
+	// Set up the router.
+	router := router.NewRouter()
 
-	// Serve.
-	log.Infof("starting server on port: %s", env.Port)
-	err = http.ListenAndServe(":"+env.Port, nil)
+	// Start the server
+	s := &http.Server{
+		Addr:    ":" + env.Port,
+		Handler: router,
+	}
+	go func() {
+		log.Info("serving on: ", env.Port)
+		if err := s.ListenAndServe(); err != nil {
+			log.Fatal("server failure", err)
+		}
+	}()
+
+	// Allow interrupt signal to gracefully shutdown with a 5-second timeout.
+	quit := make(chan os.Signal)
+	signal.Notify(quit, os.Interrupt)
+	<-quit
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	err = s.Shutdown(ctx)
 	if err != nil {
-		log.Fatal("failed to serve", err)
+		panic(err)
+	} else {
+		log.Info("gracefully shutting down")
 	}
 
 }

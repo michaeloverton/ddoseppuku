@@ -2,24 +2,10 @@ version: '3'
 
 services:
 
-  web:
-    image: xogroup/qa-api.guests.xogrp.com
+  sentinel:
+    image: michaeloverton/sentinel
     env_file:
       - ../../.env
-    # If you want to point to the QA DB locally, remove this
-    environment:
-      - GDS_MONGO_URI=mongodb://mongo:27017
     ports:
        - 3000:3000
-    restart: always
-
-  worker:
-    image: xogroup/qa-worker.guests.xogrp.com
-    env_file:
-      - ../../.env
-    # If you want to point to the QA DB locally, remove this
-    environment:
-      - WRK_MONGO_URI=mongodb://mongo:27017
-      - WRK_SQS_ENDPOINT=http://goaws:4100
-      - AWS_REGION=us-west-1
     restart: always
