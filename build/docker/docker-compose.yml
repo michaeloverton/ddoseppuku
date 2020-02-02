@@ -2,12 +2,31 @@ version: '3'
 
 services:
 
+  redis:
+    image: redis
+    ports:
+      - 6379:6379
+
   sentinel:
     image: michaeloverton/sentinel
     env_file:
       - ../../.env
+    environment:
+      - SEN_REDIS_ADDRESS=redis:6379
     ports:
-       - 3000:3000
+      - 3000:3000
+    depends_on:
+      - redis
+    restart: always
+
+  laser:
+    image: michaeloverton/laser
+    env_file:
+      - ../../.env
+    environment:
+      - LSR_REDIS_ADDRESS=redis:6379
+    depends_on:
+      - redis
     restart: always
 
   target:
@@ -15,5 +34,7 @@ services:
     env_file:
       - ../../.env
     ports:
-       - 8080:8080
+      - 3001:3001
+    depends_on:
+      - redis
     restart: always

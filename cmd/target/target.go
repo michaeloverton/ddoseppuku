@@ -29,7 +29,7 @@ func main() {
 		Handler: router,
 	}
 	go func() {
-		log.Info("serving on: ", env.Port)
+		log.Info("target serving on: ", env.Port)
 		if err := s.ListenAndServe(); err != nil {
 			log.Fatal("server failure", err)
 		}

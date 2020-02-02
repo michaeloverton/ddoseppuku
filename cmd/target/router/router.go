@@ -1,10 +1,12 @@
 package router
 
 import (
+	"io/ioutil"
 	"net/http"
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/michaeloverton/ddos-laser/cmd/target/task"
 	"github.com/michaeloverton/ddos-laser/internal/server"
 	log "github.com/sirupsen/logrus"
 )
@@ -16,15 +18,28 @@ func NewRouter() *mux.Router {
 	return router
 }
 
-type targetResponse struct {
-	Text string `json:"text"`
-}
+// type targetResponse struct {
+// 	Duration float64 `json:"duration"`
+// }
 
 func thrash(res http.ResponseWriter, req *http.Request) {
 	log.Info("responding to request from: ", req.Host)
-	resp := targetResponse{
-		Text: "whatever",
+
+	start := time.Now()
+	negativeInfinity := task.Reverse(task.PositiveInfinity)
+	elapsed := time.Since(start)
+	log.Info("negating infinity took: ", elapsed)
+
+	output := []byte(negativeInfinity)
+	err := ioutil.WriteFile("/tmp/negative", output, 0644)
+	if err != nil {
+		panic(err)
 	}
-	time.Sleep(time.Second * 5)
-	server.Serve(res, resp, 200)
+
+	// resp := targetResponse{
+	// 	Duration: elapsed.Seconds(),
+	// }
+	// time.Sleep(time.Second * 5)
+
+	server.Serve(res, nil, 200)
 }
