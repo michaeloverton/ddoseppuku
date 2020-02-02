@@ -18,6 +18,7 @@ import (
 func (s *Server) Routes() {
 	s.router.Methods("GET").Path("/attack/{URL}").HandlerFunc(s.getAttack)
 	s.router.Methods("POST").Path("/attack").HandlerFunc(s.postAttack)
+	s.router.Methods("GET").Path("/ceasefire").HandlerFunc(s.quit)
 }
 
 func (s *Server) getAttack(res http.ResponseWriter, req *http.Request) {
@@ -39,7 +40,6 @@ type attack struct {
 }
 
 func (s *Server) postAttack(res http.ResponseWriter, req *http.Request) {
-
 	// Decode response.
 	var a attack
 	err := json.NewDecoder(req.Body).Decode(&a)
@@ -57,6 +57,16 @@ func (s *Server) postAttack(res http.ResponseWriter, req *http.Request) {
 
 	// Publish the message to the attack topic.
 	err = s.redisClient.Publish("topic", a.URL).Err()
+	if err != nil {
+		logrus.Error("failed to publish to topic", err)
+		res.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+}
+
+func (s *Server) quit(res http.ResponseWriter, req *http.Request) {
+	// Publish the message to the attack topic.
+	err := s.redisClient.Publish("quit", "cease fire").Err()
 	if err != nil {
 		logrus.Error("failed to publish to topic", err)
 		res.WriteHeader(http.StatusInternalServerError)

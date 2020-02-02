@@ -4,6 +4,9 @@ run:
 run-sentinel:
 	docker-compose -f build/docker/docker-compose.yml up redis sentinel
 
+run-target:
+	docker-compose -f build/docker/docker-compose.yml up target
+
 # adjust scale to number of lasers
 run-sentinel-laser:
 	docker-compose -f build/docker/docker-compose.yml up --scale laser=1 redis sentinel laser

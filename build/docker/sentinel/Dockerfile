@@ -6,7 +6,7 @@ RUN CGO_ENABLED=0 go build
 
 # build final image
 FROM alpine:latest
-RUN apk add --update bash ca-certificates
+RUN apk add --update bash
 COPY --from=builder /go/src/github.com/michaeloverton/ddos-laser/cmd/sentinel/sentinel /opt/
 WORKDIR /opt
 EXPOSE 3000
