@@ -20,18 +20,7 @@ func main() {
 		log.Fatal("error loading environment: ", err.Error())
 	}
 
-	// Initialize Redis client.
-	// redisClient, err := redis.New(env.RedisAddress)
-	// if err != nil {
-	// 	log.Fatal("failed to initialize redis client: ", err)
-	// }
-
-	// // test publishing to a redis topic
-	// err = redisClient.Publish("target", "target.com")
-	// if err != nil {
-	// 	log.Fatal("failed to publish to topic")
-	// }
-
+	// Create Redis client for publishing messages.
 	pubClient := redis.NewClient(&redis.Options{
 		Addr:     env.RedisAddress,
 		Password: "", // no password set

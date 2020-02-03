@@ -1,5 +1,5 @@
 # build binary
-FROM golang:1.10.3 as builder
+FROM golang:1.13.7 as builder
 COPY . /go/src/github.com/michaeloverton/ddos-laser/
 WORKDIR /go/src/github.com/michaeloverton/ddos-laser/cmd/target/
 RUN CGO_ENABLED=0 go build

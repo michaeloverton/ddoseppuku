@@ -1,8 +1,10 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -16,7 +18,6 @@ import (
 // possible reference:
 // http://craigwickesser.com/2015/01/golang-http-to-many-open-files/
 // https://mtyurt.net/post/docker-how-to-increase-number-of-open-files-limit.html
-const maxRequests = 100
 
 func main() {
 	// Load the laser environment.
@@ -58,9 +59,9 @@ func main() {
 			logrus.Info("new attack on URL: ", m.Payload)
 			go makeRequests(httpClient, m.Payload, env.MaxRequests, laserQuitChan)
 		case <-sentinelQuitChan:
-			logrus.Info("quitting")
+			logrus.Info("cease fire")
 			laserQuitChan <- true
-			return
+			// return
 		}
 	}
 
@@ -70,17 +71,26 @@ func makeRequests(c http.Client, URL string, maxRequests int, quitChan chan bool
 	// Current number of requests we have made.
 	requestCount := 0
 
+	// Create cancellable context that  all requests will share.
+	cancelCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	for {
 		select {
+		// case <-cancelCtx.Done():
+		// 	return
 		case <-quitChan:
+			// When we receive a quit signal, cancel the context, so requests will be cancelled.
 			logrus.Info("stopping requests")
+			cancel()
 			return
 		default:
 			if requestCount < maxRequests {
-				// If we have not maxed  out requests, oncurrently make request to target.
+				// If we have not maxed  out requests, concurrently make request to target.
 				go func() {
+
 					// Create the request to the target.
-					req, err := http.NewRequest("GET", URL, nil)
+					req, err := http.NewRequestWithContext(cancelCtx, "GET", URL, nil)
 					if err != nil {
 						logrus.Errorf("failed to create request: %s", err)
 						return
@@ -89,6 +99,11 @@ func makeRequests(c http.Client, URL string, maxRequests int, quitChan chan bool
 					// Make the request.
 					res, err := c.Do(req)
 					if err != nil {
+						// If we cancelled the request context, then ignore the error.
+						if strings.Contains(err.Error(), "context canceled") {
+							logrus.Tracef("request failed: %s", err)
+							return
+						}
 						logrus.Errorf("request failed: %s", err)
 						return
 					}
@@ -133,28 +148,3 @@ func makeRequest(c http.Client, URL string, wg *sync.WaitGroup) {
 	wg.Done()
 
 }
-
-// func makeRequest(c http.Client, URL string, wg *sync.WaitGroup) {
-// 	logrus.Infof("making request to: %s", URL)
-
-// 	// Create the request to the target.
-// 	req, err := http.NewRequest("GET", URL, nil)
-// 	if err != nil {
-// 		logrus.Errorf("failed to create request: %s", err)
-// 		return
-// 	}
-
-// 	// Make the request.
-// 	res, err := c.Do(req)
-// 	if err != nil {
-// 		logrus.Errorf("request failed: %s", err)
-// 		return
-// 	}
-// 	defer res.Body.Close()
-
-// 	// Log response.
-// 	logrus.Info("response code:", res.StatusCode)
-
-// 	wg.Done()
-
-// }
