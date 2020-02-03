@@ -6,9 +6,10 @@ import (
 
 // SentinelEnv is the web configuration object that is populated at launch.
 type SentinelEnv struct {
-	Env      string `default:"local" required:"true"`
-	Port     string `default:"3000" required:"true"`
-	LogLevel string `split_words:"true" default:"INFO"`
+	Env          string `default:"local" required:"true"`
+	Port         string `default:"3000" required:"true"`
+	LogLevel     string `split_words:"true" default:"INFO"`
+	RedisAddress string `split_words:"true" required:"true"`
 }
 
 // LoadSentinelEnv loads the configuration object from .env

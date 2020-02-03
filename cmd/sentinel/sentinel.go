@@ -7,7 +7,8 @@ import (
 	"os/signal"
 	"time"
 
-	"github.com/michaeloverton/ddos-laser/cmd/sentinel/router"
+	"github.com/go-redis/redis"
+	"github.com/michaeloverton/ddos-laser/cmd/sentinel/server"
 	"github.com/michaeloverton/ddos-laser/internal/env"
 	log "github.com/sirupsen/logrus"
 )
@@ -19,17 +20,31 @@ func main() {
 		log.Fatal("error loading environment: ", err.Error())
 	}
 
-	// Set up the router.
-	router := router.NewRouter()
+	// Create Redis client for publishing messages.
+	pubClient := redis.NewClient(&redis.Options{
+		Addr:     env.RedisAddress,
+		Password: "", // no password set
+		DB:       0,  // use default DB
+	})
+
+	// Test connection to client.
+	_, err = pubClient.Ping().Result()
+	if err != nil {
+		log.Fatal("failed to connect to redis", err)
+	}
+
+	// Set up server and routes.
+	s := server.NewServer(pubClient)
+	s.Routes()
 
 	// Start the server
-	s := &http.Server{
+	server := &http.Server{
 		Addr:    ":" + env.Port,
-		Handler: router,
+		Handler: s.Router(),
 	}
 	go func() {
-		log.Info("serving on: ", env.Port)
-		if err := s.ListenAndServe(); err != nil {
+		log.Info("sentinel serving on: ", env.Port)
+		if err := server.ListenAndServe(); err != nil {
 			log.Fatal("server failure", err)
 		}
 	}()
@@ -40,7 +55,7 @@ func main() {
 	<-quit
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	err = s.Shutdown(ctx)
+	err = server.Shutdown(ctx)
 	if err != nil {
 		panic(err)
 	} else {

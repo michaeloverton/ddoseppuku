@@ -1,15 +1,11 @@
 package main
 
 import (
-	"context"
 	"net/http"
-	"os"
-	"os/signal"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/michaeloverton/ddos-laser/cmd/target/router"
 	"github.com/michaeloverton/ddos-laser/internal/env"
 )
 
@@ -20,31 +16,44 @@ func main() {
 		log.Fatal("error loading environment: ", err.Error())
 	}
 
-	// Set up the router.
-	router := router.NewRouter()
+	// Set up endpoints.
+	http.HandleFunc("/health", health)
+	http.HandleFunc("/thrash", taskHandler(env))
 
-	// Start the server
-	s := &http.Server{
-		Addr:    ":" + env.Port,
-		Handler: router,
-	}
-	go func() {
-		log.Info("serving on: ", env.Port)
-		if err := s.ListenAndServe(); err != nil {
-			log.Fatal("server failure", err)
-		}
-	}()
-
-	// Allow interrupt signal to gracefully shutdown with a 5-second timeout.
-	quit := make(chan os.Signal)
-	signal.Notify(quit, os.Interrupt)
-	<-quit
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	err = s.Shutdown(ctx)
+	// Serve.
+	log.Infof("target serving on: %s", env.Port)
+	err = http.ListenAndServe(":"+env.Port, nil)
 	if err != nil {
-		panic(err)
-	} else {
-		log.Info("gracefully shutting down")
+		log.Fatal("failed to serve", err)
 	}
+}
+
+// health is the health check endpoint.
+func health(res http.ResponseWriter, req *http.Request) {
+	res.WriteHeader(http.StatusOK)
+}
+
+// taskHandler performs a mock task of configurable intensity.
+func taskHandler(env *env.TargetEnv) http.HandlerFunc {
+	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
+		log.Info("responding to request from: ", req.RequestURI)
+
+		// Perform the task. Intensity set via env var.
+		start := time.Now()
+		for i := 0; i < env.TaskIntensity; i++ {
+			_ = reverse(positiveInfinity)
+		}
+		elapsed := time.Since(start)
+		log.Info("negating infinity took: ", elapsed)
+
+		res.WriteHeader(http.StatusOK)
+	})
+}
+
+func reverse(s string) string {
+	chars := []rune(s)
+	for i, j := 0, len(chars)-1; i < j; i, j = i+1, j-1 {
+		chars[i], chars[j] = chars[j], chars[i]
+	}
+	return string(chars)
 }
