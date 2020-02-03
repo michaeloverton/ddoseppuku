@@ -8,6 +8,8 @@ The `lasers` consume from the Redis queues and act accordingly. The lasers can b
 
 The `target` has two endpoints - a `/health` endpoint and a `/thrash` endpoint. The health endpoint always responds with 200 if the server is okay. The thrash endpoint mocks a task. Currently it reverses the text of Infinite Jest. The intensity of the task can be set via `TGT_TASK_INTENSITY` in the docker-compose. A single reversal takes about 30ms. A single increment in the task intensity basically doubles that value.
 
+![](/diagram.jpg?raw=true)
+
 ## Run
 
 Have Docker running.
