@@ -1,6 +1,6 @@
-package task
+package main
 
-const PositiveInfinity = `
+const positiveInfinity = `
 DAVID FOSTER WALLACE 
 
 With a foreword by DAVE EGGERS 

