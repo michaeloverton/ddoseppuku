@@ -14,7 +14,12 @@ There are three layers, which operate as separate applications. Ideally, within 
 
 The `sentinel` application receives requests for attack or cease-fire. It then queues up messages accordingly in Redis. 
 
-The `laser` application consumes from the Redis queues and acts accordingly. Multiple lasers can be scaled out horizontally (via `--scale laser=3` in the `build-all` target in the Makefile). This will spin up multiple containers with however many laser images you want. The lasers will make a maximum number of requests and then chill. The maximum number of requests each laser will make can be modified via `LSR_MAX_REQUESTS` in `/build/docker/docker-compose.yml`. Be careful making the max requests too high - at higher levels, the lasers can max out their own CPU. We are trying to destroy ourselves, but not in this layer. Also be careful scaling out too many lasers, or have fun cleaning up your mess.
+The `laser` application consumes from the Redis queues and acts accordingly. Multiple lasers can be scaled out horizontally (via `--scale laser=3` in the `build-all` target in the Makefile). This will spin up multiple containers with however many laser images you want. The lasers will make a maximum number of requests and then chill. The maximum number of requests each laser will make can be modified via `LSR_MAX_REQUESTS` in `/build/docker/docker-compose.yml`. Be careful making the max requests too high - at higher levels, the lasers can max out their own CPU. We are trying to destroy ourselves, but not in this layer. Also be careful scaling out too many lasers, or have fun cleaning up your mess. Hint: Restart Docker, then:
+
+```
+docker stop $(docker ps -a -q)
+docker rm $(docker ps -a -q)
+```
 
 The `target` application has two endpoints - a `/health` endpoint and a `/thrash` endpoint. The health endpoint always responds with 200 if the server is okay. The thrash endpoint mocks a task. Currently it reverses the text of Infinite Jest. The intensity of the task can be set via `TGT_TASK_INTENSITY` in the docker-compose. A single reversal takes about 30ms. A single increment in the task intensity basically doubles that value. The health endpoint normally responds in about 1ms, so if you slow that down, you're doing a good job.
 
@@ -25,7 +30,7 @@ The `target` application has two endpoints - a `/health` endpoint and a `/thrash
 Have Docker running.
 
 ```
-make build-all run-all
+make build run-all
 ```
 
 ## Take A Hostage

@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/go-redis/redis"
-	"github.com/michaeloverton/ddos-laser/cmd/sentinel/server"
-	"github.com/michaeloverton/ddos-laser/internal/env"
+	"github.com/michaeloverton/ddoseppuku/cmd/sentinel/server"
+	"github.com/michaeloverton/ddoseppuku/internal/env"
 	log "github.com/sirupsen/logrus"
 )
 

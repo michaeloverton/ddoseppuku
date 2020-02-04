@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/go-redis/redis"
-	"github.com/michaeloverton/ddos-laser/internal/env"
+	"github.com/michaeloverton/ddoseppuku/internal/env"
 	"github.com/sirupsen/logrus"
 )
 

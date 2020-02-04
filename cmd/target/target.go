@@ -6,7 +6,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/michaeloverton/ddos-laser/internal/env"
+	"github.com/michaeloverton/ddoseppuku/internal/env"
 )
 
 func main() {
