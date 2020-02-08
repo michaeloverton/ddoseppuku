@@ -48,8 +48,6 @@ services:
       - TGT_TASK_INTENSITY=1
     ports:
       - 3001:3001
-    depends_on:
-      - redis
     # restart: always
 
 # Split up attack and defense networks.
