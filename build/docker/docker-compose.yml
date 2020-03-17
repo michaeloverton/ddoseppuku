@@ -4,15 +4,11 @@ services:
 
   redis:
     image: redis
-    networks:
-      - attack
     ports:
       - 6379:6379
 
   sentinel:
     image: michaeloverton/sentinel
-    networks:
-      - attack
     env_file:
       - ../../.env
     environment:
@@ -25,34 +21,20 @@ services:
 
   laser:
     image: michaeloverton/laser
-    networks:
-      - attack
-      - bridge
     env_file:
       - ../../.env
     environment:
       - LSR_REDIS_ADDRESS=redis:6379
-      - LSR_MAX_REQUESTS=10000 # 10000 is a good spot - can cease fire or kill
+      - LSR_MAX_REQUESTS=10000 # 10000 is a good spot
     depends_on:
       - redis
-    # restart: always
+    restart: always
 
   target:
     image: michaeloverton/target
-    networks:
-      - defend
-      - bridge
     env_file:
       - ../../.env
     environment:
-      - TGT_TASK_INTENSITY=1
+      - TGT_TASK_INTENSITY=25
     ports:
       - 3001:3001
-    # restart: always
-
-# Split up attack and defense networks.
-# The laser is bridged to the target for easy referencing.
-networks:
-  attack:  
-  defend:
-  bridge:

