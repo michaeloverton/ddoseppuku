@@ -1,9 +1,11 @@
 package main
 
 import (
+	"encoding/json"
 	"net/http"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/michaeloverton/ddoseppuku/internal/env"
@@ -19,6 +21,7 @@ func main() {
 	// Set up endpoints.
 	http.HandleFunc("/health", health)
 	http.HandleFunc("/thrash", taskHandler(env))
+	http.HandleFunc("/login", loginHandler(env))
 
 	// Serve.
 	log.Infof("target serving on: %s", env.Port)
@@ -36,7 +39,33 @@ func health(res http.ResponseWriter, req *http.Request) {
 // taskHandler performs a mock task of configurable intensity.
 func taskHandler(env *env.TargetEnv) http.HandlerFunc {
 	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
-		log.Info("responding to request from: ", req.RequestURI)
+		// Perform the task. Intensity set via env var.
+		start := time.Now()
+		for i := 0; i < env.TaskIntensity; i++ {
+			_ = reverse(positiveInfinity)
+		}
+		elapsed := time.Since(start)
+		log.Info("negating infinity took: ", elapsed)
+
+		res.WriteHeader(http.StatusOK)
+	})
+}
+
+type Login struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+// loginHandler receives a request body and also performs a mock task of configurable intensity.
+func loginHandler(env *env.TargetEnv) http.HandlerFunc {
+	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
+		var l Login
+		err := json.NewDecoder(req.Body).Decode(&l)
+		if err != nil {
+			logrus.Error("could not decode request body", err)
+			res.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 
 		// Perform the task. Intensity set via env var.
 		start := time.Now()
