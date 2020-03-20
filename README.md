@@ -79,3 +79,9 @@ POST http://localhost:3001/login
 ```
 
 You can monitor these while an attack is going on. They will be fucked.
+
+## Seppuku
+
+The ultimate goal of this project is to point the lasers back at the sentinel and destroy the entire system. This is `seppuku`.
+
+![](/seppuku.jpg?raw=true)
